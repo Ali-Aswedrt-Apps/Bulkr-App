@@ -1,0 +1,414 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import '../models/meal.dart';
+import '../styles/app_color.dart';
+import 'bulkr_image.dart';
+import 'animations/motion.dart';
+import 'animations/press_scale.dart';
+import 'macro_bar.dart';
+import '../styles/app_fonts.dart';
+
+/// One meal in the library: photo, what it costs, and the one-tap way to eat it.
+///
+/// The photo is always the user's own — the Open Food Facts data behind a meal's
+/// ingredients never brings an image with it.
+class MealCard extends StatelessWidget {
+  const MealCard({
+    super.key,
+    required this.meal,
+    this.onLog,
+    this.onToggleFavorite,
+    this.onShowActions,
+    this.onOpen,
+    this.isLogging = false,
+  });
+
+  final Meal meal;
+
+  /// Adds one serving to today's log. Null on a read-only card.
+  ///
+  /// All three of these are nullable so the same card can be shown somewhere
+  /// it is not yours to act on — a profile shows what somebody made, and
+  /// favouriting or logging from there would need a library cubit that screen
+  /// has no business holding. A null control is hidden rather than disabled:
+  /// a greyed-out button on somebody else's meal invites a tap that will never
+  /// do anything.
+  final VoidCallback? onLog;
+
+  final VoidCallback? onToggleFavorite;
+
+  /// Opens the overflow menu, which is where removing this meal lives.
+  final VoidCallback? onShowActions;
+
+  /// Opens the detail view. Null until there is one to open.
+  final VoidCallback? onOpen;
+
+  /// This card's log write is in flight.
+  final bool isLogging;
+
+  static const Color _cardColor = Color(0xFF1A1A1A);
+  static const Color _imageColor = Color(0xFF232323);
+  static const double _imageAspect = 16 / 10;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 16.h),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AppColors.darkBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildImage(),
+          Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(14.w, 14.h, 14.w, 14.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTitle(),
+                SizedBox(height: 10.h),
+                _buildCaloriesRow(context),
+                SizedBox(height: 14.h),
+                _buildMacros(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImage() {
+    return GestureDetector(
+      onTap: onOpen,
+      child: AspectRatio(
+        aspectRatio: _imageAspect,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: _imageColor,
+              child: meal.smallImageUrl == null
+                  ? _buildImageFallback()
+                  : BulkrImage(
+                      // The small copy: this is a card in a two-column grid,
+                      // never the full-size photo.
+                      url: meal.smallImageUrl!,
+                      // A card is a column of the grid, never the full width.
+                      width: 0.5.sw,
+                      placeholderColor: _imageColor,
+                      // A meal photo is decoration, not information: a broken
+                      // URL or an offline device gets the same plate icon an
+                      // image-less meal does, never a grey error box.
+                      fallback: _buildImageFallback(),
+                    ),
+            ),
+            PositionedDirectional(top: 10.h, start: 10.w, child: _buildEmphasisChip()),
+            PositionedDirectional(
+              top: 6.h,
+              end: 6.w,
+              child: Row(
+                children: [
+                  _buildFavoriteButton(),
+                  _buildOverflowButton(),
+                ],
+              )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageFallback() {
+    return Center(
+      child: Icon(
+        Icons.restaurant_sharp,
+        size: 34.sp,
+        color: AppColors.darkBorder,
+      ),
+    );
+  }
+
+  Widget _buildEmphasisChip() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(3.r),
+      ),
+      child: Text(
+        _emphasisKey(meal.emphasis).tr().toUpperCase(),
+        style: AppFonts.body(
+          fontSize: 9.sp,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
+
+  static String _emphasisKey(MealEmphasis emphasis) => switch (emphasis) {
+        MealEmphasis.protein => 'meal_tag_protein',
+        MealEmphasis.carbs => 'meal_tag_carbs',
+        MealEmphasis.fat => 'meal_tag_fat',
+        MealEmphasis.balanced => 'meal_tag_balanced',
+      };
+
+  Widget _buildFavoriteButton() {
+    // Hidden rather than disabled — see the note on the callbacks.
+    if (onToggleFavorite == null) return const SizedBox.shrink();
+
+    return PressScale(
+      child: Semantics(
+        button: true,
+        label: (meal.isFavorite ? 'a11y_favorite_remove' : 'a11y_favorite_add').tr(),
+        selected: meal.isFavorite,
+        child: GestureDetector(
+          onTap: onToggleFavorite,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            // Padding rather than a bigger box: keeps the 44pt touch target
+            // without a visible slab sitting over the photo.
+            padding: EdgeInsets.all(8.w),
+            child: Icon(
+              meal.isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+              size: 24.sp,
+              color: meal.isFavorite ? AppColors.primaryNeon : Colors.white,
+              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverflowButton() {
+    if (onShowActions == null) return const SizedBox.shrink();
+
+    return PressScale(
+      child: Semantics(
+        button: true,
+        label: 'a11y_meal_options'.tr(),
+        child: GestureDetector(
+          onTap: onShowActions,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: EdgeInsets.all(8.w),
+            child: Icon(
+              Icons.more_vert_rounded,
+              size: 22.sp,
+              color: Colors.white,
+              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          meal.title.toUpperCase(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppFonts.display(
+            fontSize: 17.sp,
+            color: Colors.white,
+            height: 1.15,
+            letterSpacing: 0.4,
+          ),
+        ),
+        // Credit stays on meals taken from someone else's post. Absent for the
+        // user's own, where it would just be their own handle on every card.
+        if (!meal.isMine && meal.creatorUsername != null) ...[
+          SizedBox(height: 4.h),
+          Text(
+            'meal_by_author'.tr(namedArgs: {'author': meal.creatorUsername!}),
+            style: AppFonts.body(
+              fontSize: 10.sp,
+              color: AppColors.textGray,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCaloriesRow(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  NumberFormat.decimalPattern()
+                      .format(meal.totals.caloriesRounded),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppFonts.display(
+                    fontSize: 32.sp,
+                    color: AppColors.primaryNeon,
+                    height: 1,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6.w),
+              Padding(
+                padding: EdgeInsets.only(bottom: 3.h),
+                child: Text(
+                  'kcal_short'.tr().toUpperCase(),
+                  style: AppFonts.body(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.offWhiteMuted,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildLogButton(context),
+      ],
+    );
+  }
+
+  /// The whole point of the card: one tap puts this meal in today's log, and
+  /// another takes it back out.
+  ///
+  /// The lit state comes from [Meal.isLoggedToday], which is read from the
+  /// database — so it is still lit after switching tabs, pulling to refresh, or
+  /// reopening the app, rather than for as long as this screen stays alive.
+  Widget _buildLogButton(BuildContext context) {
+    if (onLog == null) return const SizedBox.shrink();
+
+    return PressScale(
+      enabled: !isLogging,
+      child: GestureDetector(
+        onTap: isLogging ? null : onLog,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: Motion.scaled(context, Motion.fast),
+          width: 46.w,
+          height: 40.h,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color:
+                meal.isLoggedToday ? AppColors.primaryNeon : const Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.circular(5.r),
+          ),
+          child: _buildLogButtonChild(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogButtonChild() {
+    if (isLogging) {
+      return SizedBox(
+        width: 18.w,
+        height: 18.w,
+        child: const CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppColors.primaryNeon,
+        ),
+      );
+    }
+
+    return Icon(
+      meal.isLoggedToday ? Icons.check_rounded : Icons.add_rounded,
+      color: meal.isLoggedToday ? Colors.black : Colors.white,
+      size: 22.sp,
+    );
+  }
+
+  Widget _buildMacros() {
+    return Row(
+      children: [
+        _MacroPill(
+          color: MacroBreakdown.proteinColor,
+          label: 'macro_protein'.tr(),
+          grams: meal.totals.proteinRounded,
+        ),
+        SizedBox(width: 10.w),
+        _MacroPill(
+          color: MacroBreakdown.carbsColor,
+          label: 'macro_carbs'.tr(),
+          grams: meal.totals.carbsRounded,
+        ),
+        SizedBox(width: 10.w),
+        _MacroPill(
+          color: MacroBreakdown.fatColor,
+          label: 'macro_fat'.tr(),
+          grams: meal.totals.fatRounded,
+        ),
+      ],
+    );
+  }
+}
+
+/// One macro figure under the calorie headline.
+class _MacroPill extends StatelessWidget {
+  const _MacroPill({
+    required this.color,
+    required this.label,
+    required this.grams,
+  });
+
+  final Color color;
+  final String label;
+  final int grams;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 7.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFF151515),
+          borderRadius: BorderRadius.circular(4.r),
+          border: BorderDirectional(start: BorderSide(color: color, width: 2.w)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppFonts.body(
+                fontSize: 8.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.offWhiteMuted,
+                letterSpacing: 1,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            Text(
+              '${grams}g',
+              style: AppFonts.display(
+                fontSize: 15.sp,
+                color: Colors.white,
+                height: 1.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

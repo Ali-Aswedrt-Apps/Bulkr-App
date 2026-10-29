@@ -1,0 +1,98 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- mobile_scanner holds the camera open to read barcodes, which needs the
+         permission declared. image_picker does not: it hands off to the camera
+         app through an intent. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <application
+        android:label="Bulkr"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Supabase OAuth callback. The provider redirects here after
+                 sign-in; without this the browser completes the handshake and
+                 never hands control back to the app.
+
+                 Must match SupabaseConfig.oauthRedirectUrl and the Redirect
+                 URL allow-list in the Supabase dashboard. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.alimahmoud.bulkr" android:host="login-callback"/>
+            </intent-filter>
+
+            <!-- Shared post links: com.alimahmoud.bulkr://post/<id>
+
+                 A separate filter rather than widening the one above, because
+                 `host` is what tells the two apart — Supabase's listener
+                 answers `login-callback` and the app answers `post`, and a
+                 filter matching the bare scheme would make that distinction
+                 impossible to see from here.
+
+                 Without this the link is inert on Android. iOS registers the
+                 whole scheme in Info.plist under CFBundleURLSchemes, so it has
+                 been reaching the app all along and simply had nothing
+                 listening; Android matches per host, so
+                 `PostLink.forPost` produced links that did not even open the
+                 app for the entire time the share buttons have existed.
+
+                 Must match `PostLink.scheme` / `PostLink.postHost` and
+                 `DeepLink.parse`. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.alimahmoud.bulkr" android:host="post"/>
+            </intent-filter>
+        </activity>
+        <!-- AdMob. The SDK reads this at startup and crashes the app on launch
+             if it is missing or belongs to the other platform.
+
+             This is the ANDROID app ID. The iOS one is in
+             ios/Runner/Info.plist under GADApplicationIdentifier, and the two
+             are not interchangeable — an app ID uses `~`, an ad unit uses `/`.
+             See docs/ADMOB.md. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6396760454728825~3257970685"/>
+
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

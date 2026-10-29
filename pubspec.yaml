@@ -1,0 +1,224 @@
+name: bulkr
+description: "Bulkr"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+version: 1.0.1+1
+
+environment:
+  sdk: ^3.9.2
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.1.0
+  flutter_screenutil: ^5.9.3
+  easy_localization: ^3.0.8
+  go_router: ^17.2.3
+
+  # Backend: auth session + the single onboarding INSERT.
+  supabase_flutter: ^2.17.1
+
+  # Onboarding state has to survive navigation between the five screens.
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.7
+  google_sign_in: ^7.2.0
+
+  # Native Sign in with Apple. Apple's own sheet rather than a browser round
+  # trip: the web flow needs a redirect back into the app, which is fragile,
+  # and Apple's review guidelines expect the native sheet on iOS anyway.
+  # Android has no native sheet, so it keeps the browser flow.
+  sign_in_with_apple: ^8.2.0
+
+  # SHA-256 for the OAuth nonce. Providers are handed the hash and Supabase the
+  # original, so neither side alone can replay the other's token.
+  crypto: ^3.0.7
+  flutter_launcher_icons: ^0.14.4
+
+  # Meal photos: the user's own camera or library. Open Food Facts product
+  # images are deliberately never used.
+  image_picker: ^1.1.2
+
+  # Open Food Facts lookups. supabase_flutter already depends on http, but the
+  # food repository calls it directly, so it is declared rather than inherited.
+  http: ^1.2.2
+
+  # Barcode scanning for the ingredient picker. A scanned code is the one input
+  # that identifies a packaged food exactly, with no spelling and no ranking.
+  # 7.x, and the floor matters. Older releases bundle a Google ML Kit that
+  # calls `-[GULUserDefaults synchronize]`, which GoogleUtilities 8 — the
+  # version firebase_core requires — removed. The app launched, ML Kit's
+  # analytics logger ran during plugin registration, and it died on an
+  # unrecognized selector before a single line of Dart executed.
+  #
+  # Android was never affected: its ML Kit does not go through GoogleUtilities.
+  mobile_scanner: ^7.0.0
+
+  # Remembering where launch should go. Already present transitively — both
+  # easy_localization and supabase_flutter use it — and declared here because
+  # AppPreferences calls it directly.
+  shared_preferences: ^2.3.2
+  # Incoming deep links — `com.alimahmoud.bulkr://post/<id>`.
+  #
+  # Already in the tree: supabase_flutter uses it for the OAuth callback, and
+  # `dependency_overrides` below pins it to 6.x for the AGP reason explained
+  # there. Declared here because `DeepLinkListener` now subscribes to it
+  # directly, and an app that imports a package it does not depend on breaks
+  # the first time the transitive one moves.
+  #
+  # Both listeners see every URI. Supabase answers `login-callback`; the app
+  # answers `post`. See `DeepLink.parse` for why that matching is strict.
+  app_links: ^6.4.1
+
+  # Opening the privacy policy in the browser. Already present transitively —
+  # supabase_flutter uses it for the OAuth hop — and declared here for the same
+  # reason `http` and `shared_preferences` are: this app calls it directly.
+  url_launcher: ^6.3.0
+
+  cached_network_image: ^4.0.0
+  image: ^4.9.2
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+
+  # What happened, on a phone nobody can attach a debugger to.
+  #
+  # The app already has a `StartupFailureScreen` because "it shows white" was
+  # the entire bug report for build 4. Everything *after* launch had the same
+  # problem and no equivalent: an exception in a build method is a grey
+  # rectangle in release, reported to nobody, and the first anyone hears of it
+  # is a one-star review.
+  #
+  # Dart errors arrive with Dart stack traces, which are already symbolicated —
+  # so this is useful without uploading a single dSYM. dSYMs only matter for
+  # crashes in native code, of which this app has very little. See
+  # ios/TESTFLIGHT.md for the upload step if that changes.
+  firebase_crashlytics: ^5.3.0
+
+  # Which features are actually used, and where people stop.
+  #
+  # Chosen over a third-party product for one reason: Firebase is already here
+  # for push, so this adds an SDK rather than a vendor — no new account, no new
+  # key, and nothing new in the privacy policy that push did not already put
+  # there. See lib/core/analytics_events.dart for what is recorded and, more
+  # importantly, what deliberately is not.
+  firebase_analytics: ^12.5.0
+  google_mobile_ads: ^9.1.0
+  app_tracking_transparency: ^2.0.7
+  in_app_purchase: ^3.3.0
+  in_app_purchase_storekit: ^0.4.13
+  in_app_purchase_android: ^0.5.3
+  # NOTE: `nsfw_detect` was removed here. It was on-device nudity detection and
+  # it worked on neither platform: on iOS the Core ML conversion declares RGB
+  # input while baking in open_nsfw's BGR channel means, so a full nude scored
+  # below a topless photo; on Android the model it downloads returns 404, so
+  # the check never ran at all. Moderation is now AWS Rekognition behind the
+  # `moderate-image` edge function — see its README.
+  #
+  # Removing it took the app's last CocoaPods plugin with it; everything else
+  # is a Swift Package. It is also why `IPHONEOS_DEPLOYMENT_TARGET` is 16.0 —
+  # that was its podspec's floor, not ours. Lowering it back to 15.0 would
+  # widen device support and is worth doing on a machine that can build iOS.
+
+  # NOTE: `intl` (DateFormat/NumberFormat) is not listed here on purpose —
+  # easy_localization re-exports it, which is how NumberFormat is already used
+  # in the reveal screen. Adding it explicitly risks a resolution conflict with
+  # the version flutter_localizations pins.
+
+dependency_overrides:
+  # Not a real dependency — a version pin.
+  #
+  # supabase_flutter pulls app_links in for the OAuth deep-link callback, with
+  # a wide constraint (>=6.4.1 <8.0.0), so pub resolves the newest. app_links
+  # 7.2.1 declares `classpath("com.android.tools.build:gradle:9.2.1")`, and AGP
+  # 9.x needs Gradle 9.x — this project is on AGP 8.9.1 / Gradle 8.12, so the
+  # :app_links subproject fails to configure and the build dies.
+  #
+  # 6.4.1 targets AGP 8.6.1, which our 8.9.1 satisfies.
+  #
+  # To drop this pin: move to Gradle >=8.14 + AGP >=8.11.1 (which Flutter is
+  # already warning about) and this can go to ^7.0.0. Reaching 7.2.1 needs the
+  # full Gradle 9 / AGP 9 jump.
+  app_links: ^6.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^5.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - assets/images/
+    - assets/translations/
+    - shorebird.yaml
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  remove_alpha_ios: true # Forces removal of alpha channel for iOS
